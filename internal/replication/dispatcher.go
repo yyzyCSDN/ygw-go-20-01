@@ -54,13 +54,20 @@ func (d *Dispatcher) PlanSnapshot(snapshot model.Snapshot) (Plan, error) {
 	if d == nil {
 		return Plan{}, fmt.Errorf("replication: dispatcher unavailable")
 	}
-	if err := d.planGuard(snapshot); err != nil {
+	total, err := d.planGuard(snapshot)
+	if err != nil {
 		return Plan{}, err
 	}
 	if err := validatePlanableSnapshot(snapshot); err != nil {
 		return Plan{}, err
 	}
-	destinations := d.registry.Eligible(1)
+	destinations := d.registry.Eligible(total)
+	if len(destinations) == 0 {
+		if d.audit != nil {
+			d.audit.Record("replication-capacity-rejected", snapshot.ID, fmt.Sprintf("plan required %d bytes", total), d.clock())
+		}
+		return Plan{}, fmt.Errorf("replication: %w: no destination can hold snapshot %s (%d bytes)", model.ErrCapacity, snapshot.ID, total)
+	}
 	plan, err := d.planner.Build(snapshot, destinations, d.clock().Unix())
 	if err != nil {
 		return Plan{}, err
@@ -68,18 +75,18 @@ func (d *Dispatcher) PlanSnapshot(snapshot model.Snapshot) (Plan, error) {
 	return plan, d.finishPlan(plan)
 }
 
-func (d *Dispatcher) planGuard(snapshot model.Snapshot) error {
+func (d *Dispatcher) planGuard(snapshot model.Snapshot) (int64, error) {
 	if _, err := planableSnapshotState(snapshot); err != nil {
-		return err
+		return 0, err
 	}
 	total, err := totalSnapshotBytes(snapshot.Chunks)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if total <= 0 {
-		return fmt.Errorf("replication: snapshot %s has no bytes to replicate", snapshot.ID)
+		return 0, fmt.Errorf("replication: snapshot %s has no bytes to replicate", snapshot.ID)
 	}
-	return nil
+	return total, nil
 }
 
 func (d *Dispatcher) reservePlan(plan Plan) error {
