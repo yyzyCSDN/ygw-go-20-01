@@ -199,3 +199,6 @@ func (s *Service) ReplicationOutcomeSummary() (int, int, int) {
 	return s.replication.OutcomeSummary()
 }
 
+func (s *Service) CaptureFailureCount(name string) uint64 {
+	return s.telemetry.FailureCount(name)
+}
