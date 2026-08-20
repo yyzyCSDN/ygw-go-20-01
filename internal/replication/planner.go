@@ -32,6 +32,9 @@ func validatePlanableSnapshot(snapshot model.Snapshot) error {
 	if snapshot.ID == "" {
 		return fmt.Errorf("replication: snapshot id is empty")
 	}
+	if snapshot.State == model.SnapshotExpired {
+		return fmt.Errorf("replication: snapshot %s is expired: %w", snapshot.ID, model.ErrExpired)
+	}
 	if len(snapshot.Chunks) == 0 {
 		return fmt.Errorf("replication: snapshot has no chunks")
 	}

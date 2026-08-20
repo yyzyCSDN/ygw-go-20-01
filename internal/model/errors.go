@@ -9,6 +9,7 @@ var (
 	ErrLeaseFenced       = errors.New("backupmesh: lease fenced")
 	ErrJournalClosed     = errors.New("backupmesh: journal closed")
 	ErrInvalidTransition = errors.New("backupmesh: invalid transition")
+	ErrExpired           = errors.New("backupmesh: snapshot expired")
 	ErrCapacity          = errors.New("backupmesh: capacity exceeded")
 	ErrCancelled         = errors.New("backupmesh: operation cancelled")
 )
