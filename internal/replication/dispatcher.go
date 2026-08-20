@@ -87,7 +87,16 @@ func (d *Dispatcher) planGuard(snapshot model.Snapshot) error {
 }
 
 func (d *Dispatcher) reservePlan(plan Plan) error {
-	d.budget.Reserve(plan.ID, plan.TotalBytes)
+	// A snapshot may hold at most one unfinished plan. The plan ID is derived
+	// from the snapshot ID and its (immutable) generation, so an existing
+	// reservation for this plan ID means the snapshot already has an in-flight
+	// plan and the duplicate must be rejected rather than re-charging budget.
+	if d.budget.Reserved(plan.ID) {
+		return fmt.Errorf("replication: snapshot %s already has an unfinished plan %s: %w", plan.SnapshotID, plan.ID, model.ErrConflict)
+	}
+	if !d.budget.Reserve(plan.ID, plan.TotalBytes) {
+		return fmt.Errorf("replication: budget cannot reserve %d bytes for plan %s: %w", plan.TotalBytes, plan.ID, model.ErrCapacity)
+	}
 	return nil
 }
 
