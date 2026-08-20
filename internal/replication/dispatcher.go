@@ -142,6 +142,16 @@ func (d *Dispatcher) Complete(plan Plan, succeeded bool) {
 	if d == nil {
 		return
 	}
+	// Idempotent completion: a plan may only be recorded once. The second
+	// completion of an already-completed plan is ignored so the outcome window,
+	// statistics, and audit ledger are not double-counted.
+	d.mu.Lock()
+	if d.completed[plan.ID] {
+		d.mu.Unlock()
+		return
+	}
+	d.completed[plan.ID] = true
+	d.mu.Unlock()
 	d.budget.Release(plan.ID)
 	now := d.clock().UTC()
 	for _, destination := range plan.Destinations {
