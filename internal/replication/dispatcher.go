@@ -54,6 +54,9 @@ func (d *Dispatcher) PlanSnapshot(snapshot model.Snapshot) (Plan, error) {
 	if d == nil {
 		return Plan{}, fmt.Errorf("replication: dispatcher unavailable")
 	}
+	if err := d.planGuard(snapshot); err != nil {
+		return Plan{}, err
+	}
 	if err := validatePlanableSnapshot(snapshot); err != nil {
 		return Plan{}, err
 	}
@@ -67,6 +70,20 @@ func (d *Dispatcher) PlanSnapshot(snapshot model.Snapshot) (Plan, error) {
 		return Plan{}, err
 	}
 	return plan, d.finishPlan(plan)
+}
+
+func (d *Dispatcher) planGuard(snapshot model.Snapshot) error {
+	if _, err := planableSnapshotState(snapshot); err != nil {
+		return err
+	}
+	total, err := totalSnapshotBytes(snapshot.Chunks)
+	if err != nil {
+		return err
+	}
+	if total <= 0 {
+		return fmt.Errorf("replication: snapshot %s has no bytes to replicate", snapshot.ID)
+	}
+	return nil
 }
 
 func (d *Dispatcher) reservePlan(plan Plan) error {

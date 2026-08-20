@@ -28,12 +28,26 @@ type Planner struct{}
 
 func NewPlanner() *Planner { return &Planner{} }
 
+func planableSnapshotState(snapshot model.Snapshot) (string, error) {
+	switch snapshot.State {
+	case model.SnapshotExpired:
+		return string(snapshot.State), fmt.Errorf("replication: snapshot %s is expired and not planable", snapshot.ID)
+	case model.SnapshotStaged, model.SnapshotPublished, model.SnapshotVerified:
+		return string(snapshot.State), nil
+	default:
+		return string(snapshot.State), fmt.Errorf("replication: snapshot %s has unknown state %s", snapshot.ID, snapshot.State)
+	}
+}
+
 func validatePlanableSnapshot(snapshot model.Snapshot) error {
 	if snapshot.ID == "" {
 		return fmt.Errorf("replication: snapshot id is empty")
 	}
 	if len(snapshot.Chunks) == 0 {
 		return fmt.Errorf("replication: snapshot has no chunks")
+	}
+	if _, err := planableSnapshotState(snapshot); err != nil {
+		return err
 	}
 	return nil
 }
